@@ -200,8 +200,8 @@ def create_horizontal_mirrored_visualizer(audio_path, image_path, output_path,
         center_img = load_center_image(image_path, img_size, corner_radius)
 
         # ── Pre-create smaller glow overlay ──
-        glow_size = img_size + int(glow_intensity * 0.6)  # Tighter glow
-        glow = create_glow(glow_size, glow_intensity, corner_radius, blur_radius=4)
+        glow_size = img_size + int(glow_intensity * 0.3)  # Very tight glow
+        glow = create_glow(glow_size, glow_intensity, corner_radius, blur_radius=3)
 
         # ── Pre-render background (ONCE) ──
         log_progress(job_id, "log", None, "Pre-rendering background...")
@@ -220,6 +220,8 @@ def create_horizontal_mirrored_visualizer(audio_path, image_path, output_path,
         max_bar_length = int((w - img_size) / 2 * 0.85)
         center_x = w // 2
         center_y = h // 2
+        # Gap between image edge and bar start
+        bar_gap = int(img_size * 0.08)  # ~8% of image size as breathing room
         # Each bar+gap fits exactly within img_size
         bar_unit = img_size / num_bars
         bar_height = max(3, int(bar_unit * 0.55))
@@ -276,15 +278,15 @@ def create_horizontal_mirrored_visualizer(audio_path, image_path, output_path,
                 by = start_y + i * (bar_height + gap_between_bars)
                 by2 = by + bar_height
 
-                # Left bar (extends from centre-left outward)
-                lx1 = int(center_x - img_size // 2 - pulse_offset - bar_len)
-                lx2 = int(center_x - img_size // 2 - pulse_offset)
+                # Left bar (extends from centre-left outward with gap)
+                lx1 = int(center_x - img_size // 2 - bar_gap - pulse_offset - bar_len)
+                lx2 = int(center_x - img_size // 2 - bar_gap - pulse_offset)
                 if lx1 < 0:
                     lx1 = 0
                 frame[by:by2, lx1:lx2] = (r, g, b_col)
 
-                # Right bar (extends from centre-right outward)
-                rx1 = int(center_x + img_size // 2 + pulse_offset)
+                # Right bar (extends from centre-right outward with gap)
+                rx1 = int(center_x + img_size // 2 + bar_gap + pulse_offset)
                 rx2 = int(rx1 + bar_len)
                 if rx2 > w:
                     rx2 = w
