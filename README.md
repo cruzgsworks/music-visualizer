@@ -1,177 +1,158 @@
 # AI Cover Visualizer
 
-Create stunning music visualizer videos from audio files and center images. Now with a modern web interface!
+Create stunning audio-reactive music visualizer videos. Deployed at **cruzgsworks.space/music-visualizer**.
 
-## 📁 Project Structure
+## Tech Stack
 
 ```
-📁 ai-cover-visualizer/
-├── 📁 input/                   ⬅️ Put your audio/image files here
-├── 📁 output/                  ⬅️ Generated videos saved here
-├── 📁 scripts/                 ⬅️ Launch scripts (double-click these!)
-│   ├── Start Web Server.bat    ⭐ Start the web interface
-│   ├── Launch Visualizer.bat   🖥️ Launch desktop GUI
-│   └── Setup.ps1               🔧 Setup script
-├── 📁 src/
-│   ├── 📁 python/              🐍 Python scripts
-│   │   ├── generate_video.py   (Video generator - used by web)
-│   │   ├── visualizer_gui.py   (Desktop GUI)
-│   │   ├── create_visualizer.py (CLI version)
-│   │   └── test_button.py      (Test script)
-│   └── 📁 node/                🟢 Node.js backend
-│       ├── server.js           (Web server)
-│       └── package.json        (Dependencies)
-├── 📁 web/
-│   └── 📁 public/              🌐 Web interface files
-│       ├── index.html          (Main page)
-│       ├── 📁 css/
-│       │   └── style.css       (Styles)
-│       └── 📁 js/
-│           └── app.js          (JavaScript)
-├── 📄 requirements.txt         Python dependencies
-├── 📄 package.json             (in src/node)
-└── 📄 README.md                This file
+Frontend (Browser)              HTML + CSS + JavaScript + jQuery
+        ↓ HTTP / WebSocket
+Web Server (Node.js)            Express + ws (port 3000)
+        ↓ spawn + stdout JSON
+Video Generator (Python)        librosa + numpy + Pillow
+        ↓ raw RGB24 pipe
+Video Encoder (ffmpeg)          h264_nvenc / libx264 + AAC
+        ↓
+Output Video (MP4)
 ```
 
-## 🚀 Quick Start
+## Architecture
 
-### Option 1: Web Interface (Recommended)
+| Layer             | Technology                          | Role                                                                           |
+|-------------------|-------------------------------------|--------------------------------------------------------------------------------|
+| **Frontend**      | HTML/CSS/JS + Bootstrap 5 + jQuery  | Upload UI, settings panel, real-time progress bar, recent downloads            |
+| **Server**        | Node.js + Express + ws              | File upload, job orchestration, WebSocket broadcast, download serve            |
+| **Rendering**     | Python 3 + librosa + numpy + Pillow | Audio analysis (STFT), frame generation (bar rendering, compositing)           |
+| **Encoding**      | ffmpeg (NVENC/AMF/libx264)          | Raw frame pipe to compressed MP4 with audio muxing                             |
+| **Reverse proxy** | Apache 2.4                          | HTTPS termination, path-based routing (`/music-visualizer`), WebSocket upgrade |
+| **OS**            | Ubuntu 24.04 + systemd              | Service management, auto-start                                                 |
 
-**Easiest way:**
-1. Install [Node.js](https://nodejs.org) (if not installed)
-2. **Double-click** `scripts/Start Web Server.bat`
-3. Open browser to **http://localhost:3000**
-4. Upload your audio and image files
-5. Click **Generate Video**
+## Hardware
 
-### Option 2: Desktop GUI
+- **CPU:** AMD Ryzen 7 8845HS (8C/16T)
+- **GPU:** NVIDIA GeForce RTX 4070 Laptop (8GB VRAM)
+- **RAM:** 32GB
 
-**Double-click** `scripts/Launch Visualizer.bat`
+## Features
 
-### Option 3: Command Line
+### Current
+- **Teal/cyan glassmorphism UI** matching cruzgsworks.space/vocal-ref theme
+- **Real-time WebSocket progress** — frame-by-frame progress bar with smooth shimmer animation
+- **Two visualizer styles:**
+  - **Circular Orb** — radial bars around centre image with 2x supersampled anti-aliasing
+  - **Horizontal Mirrored Bars** — mirrored left/right bars with rounded-square centre image
+- **Recent Downloads panel** — persisted in localStorage across page refreshes
+- **Smart filename** — `{sanitized_songname}_{jobId}.mp4` with filesystem-safe sanitization
+- **Persistent filename mapping** — `_mapping.json` survives server restarts; legacy `output_{jobId}.mp4` fallback
+- **GPU auto-detect** — tries NVENC, then AMF, falls back to libx264
+- **Presets:** YouTube (1920x1080), TikTok (1080x1920), Instagram (1080x1080)
+- **Customizable:** resolution, FPS (15-60), bar count (32-128), glow intensity, bar sensitivity, GPU mode
+- **Two file upload** (audio + image) with drag-and-drop
+- **Systemd service** with auto-restart on crash/boot
+- **Apache reverse proxy** with WebSocket upgrade support
+
+## Optimization Progress
+
+| Phase | Change                                                            | Status     | Speedup         |
+|-------|-------------------------------------------------------------------|------------|-----------------|
+| —     | Original: PNG frames to disk, per-frame FFT, PIL bars, CPU encode | Baseline   | 1x              |
+| P1    | Raw RGB24 pipe to ffmpeg stdin (no disk I/O)                      | ✅ Deployed | **~3-5x**       |
+| P1    | Pre-rendered background (once per job, not per frame)             | ✅ Deployed | **~1.3x**       |
+| P1    | Batch STFT via librosa (vs per-frame FFT)                         | ✅ Deployed | **~5x** audio   |
+| P1    | Numpy slice bars (horizontal style)                               | ✅ Deployed | **~2-5x**       |
+| P1    | Auto GPU detect + NVENC `p4` preset                               | ✅ Deployed | **~10x** encode |
+| P2    | Multiprocessing frame pool                                        | ⏳ Planned  | **~6-8x**       |
+| P2    | Threaded ffmpeg pipe (producer-consumer)                          | ⏳ Planned  | **~1.5-2x**     |
+| P3    | ModernGL + GLSL shader rendering                                  | 🔮 Future  | **~10-20x**     |
+
+**Estimated current speedup: 10-30x** over original (3-min 1080p video: ~15 min to ~30-90 s)
+
+## API Endpoints
+
+| Method | Path                   | Purpose                                 |
+|--------|------------------------|-----------------------------------------|
+| `POST` | `/api/upload`          | Upload audio + image files (multipart)  |
+| `POST` | `/api/generate`        | Start video generation (returns job ID) |
+| `POST` | `/api/cancel/:jobId`   | Cancel running job                      |
+| `GET`  | `/api/download/:jobId` | Download completed video                |
+| `GET`  | `/api/status/:jobId`   | Check if output file exists             |
+| `WS`   | `/api/ws`              | WebSocket — real-time progress events   |
+
+### WebSocket Events
+
+```json
+{"type": "log",       "jobId": "...", "message": "..."}
+{"type": "progress",  "jobId": "...", "value": 45.2, "message": "Frame 900/1836"}
+{"type": "complete",  "jobId": "...", "success": true,
+                      "downloadUrl": "api/download/...", "filename": "song_....mp4"}
+{"type": "complete",  "jobId": "...", "success": false, "error": "..."}
+{"type": "cancelled", "jobId": "..."}
+```
+
+## Deployment
+
+### Dependencies
+```bash
+cd /path/to/music-visualizer
+
+# Node.js
+cd src/node && npm install
+
+# Python
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# ffmpeg (with NVENC support for NVIDIA GPUs)
+sudo apt install ffmpeg
+```
+
+### systemd Service
+```bash
+sudo cp music-visualizer.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now music-visualizer.service
+```
+
+### Apache Reverse Proxy
+```apache
+ProxyPass /music-visualizer http://127.0.0.1:3000
+ProxyPassReverse /music-visualizer http://127.0.0.1:3000
+
+RewriteCond %{HTTP:Upgrade} =websocket [NC]
+RewriteRule ^/music-visualitor(/.*)?$ ws://127.0.0.1:3000$1 [P,L]
+```
+
+## File Layout
+
+```
+music-visualizer/
+├── src/
+│   ├── node/
+│   │   ├── server.js          Express + WebSocket + job orchestration
+│   │   └── package.json
+│   └── python/
+│       └── generate_video.py  Frame rendering + ffmpeg pipe
+├── web/public/
+│   ├── index.html             UI
+│   ├── css/style.css          Teal/cyan glassmorphism theme
+│   └── js/app.js              Client logic + WebSocket + localStorage
+├── uploads/                   Uploaded audio/image files (auto-cleaned)
+├── output/                    Generated MP4 files
+│   └── _mapping.json          jobId to filename persistence
+├── apache-proxy.conf          Apache proxy template
+├── music-visualizer.service   systemd unit template
+├── requirements.txt
+└── README.md
+```
+
+## CLI Usage (standalone, no web server needed)
 
 ```bash
 cd src/python
-python generate_video.py --audio "../../input/song.mp3" --image "../../input/cover.png" --output "../../output/video.mp4" --job-id "my-job"
-```
+source ../venv/bin/activate
 
-## ✨ Features
-
-- 🎵 Audio-reactive visualizer bars
-- 🖼️ Circular center image with glow effect
-- 📐 Multiple presets (YouTube, TikTok, Instagram, 4K)
-- 🌐 Modern web interface with drag & drop
-- 📊 Real-time progress tracking
-- 🎨 Customizable settings
-
-## 📋 Requirements
-
-- **Node.js** v14+ (for web interface)
-- **Python** 3.8+ (for video generation)
-- **ffmpeg** (for video encoding)
-  - Windows: `choco install ffmpeg`
-  - Download: https://ffmpeg.org/download.html
-
-## 📦 Installation
-
-### 1. Install Python Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-Required packages:
-- librosa (audio analysis)
-- numpy (computations)
-- Pillow (image processing)
-- soundfile, audioread (audio support)
-
-### 2. Install Node.js Dependencies
-
-```bash
-cd src/node
-npm install
-```
-
-## 🎯 Usage Guide
-
-### Web Interface
-
-1. **Upload Files:**
-   - Drag & drop or click to browse
-   - Audio: MP3, WAV, FLAC, M4A, AAC
-   - Image: PNG, JPG, JPEG, GIF, BMP, WEBP
-
-2. **Select Preset:**
-   - **YouTube:** 1920×1080 (16:9)
-   - **TikTok:** 1080×1920 (9:16)
-   - **Instagram:** 1080×1080 (1:1)
-
-3. **Customize (Optional):**
-   - Resolution: 4K, 1080p, 720p, or custom
-   - Frame Rate: 15-60 FPS
-   - Visualizer Bars: 32-128 bars
-   - Glow Intensity: 0-100%
-
-4. **Generate:**
-   - Click "Generate Video"
-   - Watch real-time progress
-   - Download when complete!
-
-### Settings Explained
-
-| Setting | Description | Default |
-|---------|-------------|---------|
-| **Resolution** | Output video dimensions | 1920×1080 |
-| **Frame Rate** | Frames per second (higher = smoother) | 30 |
-| **Visualizer Bars** | Number of frequency bars | 64 |
-| **Glow Intensity** | Brightness of image glow | 50% |
-
-## 🎬 How It Works
-
-1. **Upload** your audio and image via the web interface
-2. **Server** receives files and validates them
-3. **Python** analyzes audio frequencies using librosa
-4. **Frames** are generated with reactive visualizer bars
-5. **FFmpeg** combines frames and audio into MP4
-6. **Download** your finished video!
-
-## 🐛 Troubleshooting
-
-### "Cannot find module"
-```bash
-cd src/node
-npm install
-```
-
-### "Python not found"
-- Install Python from https://python.org
-- Check "Add Python to PATH" during installation
-
-### "ffmpeg not found"
-- Install ffmpeg: `choco install ffmpeg`
-- Or download from https://ffmpeg.org/download.html
-
-### "Port 3000 already in use"
-Edit `src/node/server.js` and change: `const PORT = process.env.PORT || 3000;`
-
-### Slow rendering
-- Video generation is CPU-intensive
-- 3-minute song takes 5-15 minutes depending on:
-  - Resolution (4K takes longer than 1080p)
-  - Frame rate (60fps takes longer than 30fps)
-  - Your CPU speed
-
-## 📂 File Locations
-
-- **Input files:** Place audio/images in `input/`
-- **Output videos:** Generated videos saved to `output/`
-- **Temporary files:** Auto-cleaned after generation
-
-## 📝 Command Line Options
-
-```bash
-python src/python/generate_video.py \
+python generate_video.py \
   --audio "input/song.mp3" \
   --image "input/cover.png" \
   --output "output/video.mp4" \
@@ -179,35 +160,29 @@ python src/python/generate_video.py \
   --fps 30 \
   --bars 64 \
   --glow 50 \
-  --job-id "unique-id"
+  --bar-sensitivity 60 \
+  --gpu-mode auto \
+  --style circular \
+  --job-id "my-job"
 ```
 
-## 🛠️ Development
+## Roadmap
 
-### Project Architecture
+### Phase 2 — Parallelism
+- [ ] `multiprocessing.Pool` for parallel frame rendering (6-8x speedup)
+- [ ] Threaded ffmpeg pipe with producer-consumer queue (1.5-2x)
+- [ ] Benchmark to confirm bottleneck
 
-```
-Frontend (Browser)
-    ↓ HTTP/WebSocket
-Web Server (Node.js/Express)
-    ↓ Spawn Process
-Video Generator (Python)
-    ↓ FFmpeg
-Output Video (MP4)
-```
+### Phase 3 — GPU Rendering (if needed)
+- [ ] ModernGL offscreen FBO + GLSL fragment shaders
+- [ ] Upload FFT data as GPU uniforms
+- [ ] Single draw call renders entire frame on GPU
 
-### Adding Features
+### Polish
+- [ ] Progress ETA estimate
+- [ ] Keyboard shortcuts
+- [ ] Drag-and-drop recent downloads reordering
 
-- **Frontend:** Edit `web/public/` files
-- **Backend:** Edit `src/node/server.js`
-- **Video Logic:** Edit `src/python/generate_video.py`
+## License
 
-## 📄 License
-
-MIT License - Feel free to use and modify!
-
----
-
-**Created with ❤️ for AI music covers**
-
-Need help? Check the docs or create an issue!
+MIT
