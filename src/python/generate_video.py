@@ -144,7 +144,7 @@ def load_center_image(image_path, img_size, corner_radius=None):
     return img
 
 
-def create_glow(glow_size, glow_intensity, corner_radius=None, color=(64, 224, 208)):
+def create_glow(glow_size, glow_intensity, corner_radius=None, color=(64, 224, 208), blur_radius=5):
     """Pre-create glow overlay as RGBA PIL Image"""
     glow = Image.new('RGBA', (glow_size, glow_size), (0, 0, 0, 0))
     glow_draw = ImageDraw.Draw(glow)
@@ -196,12 +196,12 @@ def create_horizontal_mirrored_visualizer(audio_path, image_path, output_path,
         log_progress(job_id, "log", None, "Processing image...")
         min_dim = min(resolution)
         img_size = int(min_dim * 0.45)
-        corner_radius = int(img_size * 0.15)
+        corner_radius = int(img_size * 0.06)  # Smaller radius (6% instead of 15%)
         center_img = load_center_image(image_path, img_size, corner_radius)
 
-        # ── Pre-create glow overlay ──
-        glow_size = img_size + int(glow_intensity * 1.5)
-        glow = create_glow(glow_size, glow_intensity, corner_radius)
+        # ── Pre-create smaller glow overlay ──
+        glow_size = img_size + int(glow_intensity * 0.6)  # Tighter glow
+        glow = create_glow(glow_size, glow_intensity, corner_radius, blur_radius=4)
 
         # ── Pre-render background (ONCE) ──
         log_progress(job_id, "log", None, "Pre-rendering background...")
@@ -216,14 +216,15 @@ def create_horizontal_mirrored_visualizer(audio_path, image_path, output_path,
         proc = start_ffmpeg_pipe(output_path, audio_path, w, h, fps,
                                  video_codec, video_preset, video_params)
 
-        # ── Visualizer geometry ──
-        bar_height = int(h * 0.025)
+        # ── Visualizer geometry (bar area fits center image height) ──
         max_bar_length = int((w - img_size) / 2 * 0.85)
-        gap_between_bars = int(h * 0.015)
         center_x = w // 2
         center_y = h // 2
-        total_vh = num_bars * (bar_height + gap_between_bars)
-        start_y = center_y - total_vh // 2
+        # Each bar+gap fits exactly within img_size
+        bar_unit = img_size / num_bars
+        bar_height = max(3, int(bar_unit * 0.55))
+        gap_between_bars = max(1, int(bar_unit * 0.45))
+        start_y = center_y - img_size // 2
 
         # Pre-allocate frame buffer
         frame = np.empty((h, w, 3), dtype=np.uint8)
