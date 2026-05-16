@@ -280,7 +280,19 @@ small.text-muted {
 .progress-bar {
     border-radius: 10px;
     transition: width 0.3s ease;
-    background: linear-gradient(90deg, #20b2aa, #40e0d0);
+    background: linear-gradient(90deg, 
+        #20b2aa 0%, 
+        #40e0d0 50%, 
+        #20b2aa 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    0%   { background-position: 100% 0; }
+    50%  { background-position: 0% 0; }
+    100% { background-position: 100% 0; }
 }
 
 /* Log Console */
@@ -525,4 +537,50 @@ a:hover {
 
 #gpuMode option:hover {
     background: #006994;
+}
+
+/* Recent Downloads Panel */
+#recentDownloadsSection .card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#recentDownloadsSection .card-header {
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.75rem 1rem;
+}
+
+#recentDownloadsSection .card-header h6 {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+#recentDownloadsSection .list-group-item {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    padding: 0.75rem 1rem;
+}
+
+#recentDownloadsSection .list-group-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+#recentDownloadsSection .download-recent-btn {
+    border-color: rgba(64, 224, 208, 0.5);
+    color: #40e0d0;
+    transition: all 0.2s ease;
+}
+
+#recentDownloadsSection .download-recent-btn:hover {
+    background: rgba(64, 224, 208, 0.15);
+    border-color: #40e0d0;
+    color: #40e0d0;
+    transform: translateY(-1px);
+}
+
+#recentDownloadsSection .card-footer {
+    background: rgba(0, 0, 0, 0.1);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }

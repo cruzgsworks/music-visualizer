@@ -126,6 +126,21 @@
                             </small>
                         </div>
 
+                        <!-- Visualizer Style -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-palette me-1"></i>Visualizer Style
+                            </label>
+                            <select class="form-select" id="visualizerStyle">
+                                <option value="circular" selected>Circular Orb (Default)</option>
+                                <option value="horizontal">Horizontal Mirrored Bars</option>
+                            </select>
+                            <small class="text-muted">
+                                <strong>Circular:</strong> Bars form a ring around a circular image.<br>
+                                <strong>Horizontal:</strong> Bars extend left/right from a rounded square image.
+                            </small>
+                        </div>
+
                         <div class="row">
                             <!-- Resolution -->
                             <div class="col-md-6 mb-3">
@@ -209,7 +224,7 @@
                                 <span class="text-muted" id="progressPercent">0%</span>
                             </div>
                             <div class="progress" style="height: 25px;">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                                <div class="progress-bar" 
                                      id="progressBar" role="progressbar" style="width: 0%">
                                 </div>
                             </div>
@@ -232,6 +247,26 @@
                             <button type="button" class="btn btn-success btn-lg" id="downloadBtn">
                                 <i class="bi bi-download me-2"></i>Download Video
                             </button>
+                        </div>
+
+                        <!-- Recent Downloads Section -->
+                        <div id="recentDownloadsSection" class="mt-4" style="display: none;">
+                            <div class="card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Recent Downloads</h6>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="clearHistoryBtn">
+                                        <i class="bi bi-trash"></i> Clear History
+                                    </button>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="list-group list-group-flush" id="recentDownloadsList">
+                                        <!-- Downloads will be populated here -->
+                                    </div>
+                                </div>
+                                <div class="card-footer text-muted small">
+                                    <i class="bi bi-info-circle me-1"></i>Videos are stored for 24 hours. Download links expire after that.
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Error Section -->

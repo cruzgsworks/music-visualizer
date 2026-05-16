@@ -75,6 +75,52 @@ const upload = multer({
     }
 });
 
+// Sanitize filename for filesystem safety
+function sanitizeFilename(name) {
+    // Strip extension
+    const noExt = name.replace(/\.[^/.]+$/, '');
+    // Replace any non-alphanumeric characters (except - _ .) with underscore
+    let sanitized = noExt.replace(/[^a-zA-Z0-9._-]/g, '_');
+    // Collapse multiple underscores/dots/dashes
+    sanitized = sanitized.replace(/[_]{2,}/g, '_');
+    sanitized = sanitized.replace(/[.]{2,}/g, '.');
+    sanitized = sanitized.replace(/[-]{2,}/g, '-');
+    // Remove leading/trailing special chars
+    sanitized = sanitized.replace(/^[._-]+/, '');
+    sanitized = sanitized.replace(/[._-]+$/, '');
+    // Truncate to 60 chars
+    if (sanitized.length > 60) {
+        sanitized = sanitized.substring(0, 60);
+    }
+    // Fallback if empty
+    if (!sanitized) {
+        sanitized = 'visualizer';
+    }
+    return sanitized;
+}
+
+// Store completed job filenames (persistent mapping)
+const mappingPath = path.join(outputsDir, '_mapping.json');
+
+function loadMapping() {
+    try {
+        if (fs.existsSync(mappingPath)) {
+            return JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+        }
+    } catch (e) {
+        console.error('Error loading mapping:', e.message);
+    }
+    return {};
+}
+
+function saveMapping(mapping) {
+    try {
+        fs.writeFileSync(mappingPath, JSON.stringify(mapping, null, 2));
+    } catch (e) {
+        console.error('Error saving mapping:', e.message);
+    }
+}
+
 // Store active jobs
 const activeJobs = new Map();
 
@@ -135,7 +181,7 @@ app.post('/api/upload', upload.fields([
 
 // Generate video endpoint
 app.post('/api/generate', async (req, res) => {
-    const { jobId, audioFilename, imageFilename, settings } = req.body;
+    const { jobId, audioFilename, imageFilename, audioOriginalName, settings } = req.body;
 
     if (!jobId || !audioFilename || !imageFilename) {
         return res.status(400).json({ error: 'Missing required parameters' });
@@ -143,7 +189,8 @@ app.post('/api/generate', async (req, res) => {
 
     const audioPath = path.join(uploadsDir, audioFilename);
     const imagePath = path.join(uploadsDir, imageFilename);
-    const outputFilename = `output_${jobId}.mp4`;
+    const baseName = audioOriginalName ? sanitizeFilename(audioOriginalName) : 'visualizer';
+    const outputFilename = `${baseName}_${jobId}.mp4`;
     const outputPath = path.join(outputsDir, outputFilename);
 
     // Check files exist
@@ -167,6 +214,7 @@ app.post('/api/generate', async (req, res) => {
         '--glow', String(settings.glowIntensity || 50),
         '--bar-sensitivity', String(settings.barSensitivity || 60),
         '--gpu-mode', settings.gpuMode || 'cpu',
+        '--style', settings.style || 'circular',
         '--job-id', jobId
     ];
 
@@ -204,6 +252,11 @@ app.post('/api/generate', async (req, res) => {
         activeJobs.delete(jobId);
 
         if (code === 0 && fs.existsSync(outputPath)) {
+            // Save filename mapping for later downloads
+            const mapping = loadMapping();
+            mapping[jobId] = outputFilename;
+            saveMapping(mapping);
+
             broadcastProgress(jobId, {
                 type: 'complete',
                 success: true,
@@ -249,11 +302,26 @@ app.post('/api/cancel/:jobId', (req, res) => {
 // Download endpoint
 app.get('/api/download/:jobId', (req, res) => {
     const { jobId } = req.params;
-    const filename = `output_${jobId}.mp4`;
+    const mapping = loadMapping();
+    let filename = mapping[jobId];
+
+    // Fallback for old files from before mapping was introduced
+    if (!filename) {
+        const legacyPath = path.join(outputsDir, `output_${jobId}.mp4`);
+        if (fs.existsSync(legacyPath)) {
+            filename = `output_${jobId}.mp4`;
+            mapping[jobId] = filename;
+            saveMapping(mapping);
+        }
+    }
+
+    if (!filename) {
+        return res.status(404).json({ error: 'File not found' });
+    }
     const filePath = path.join(outputsDir, filename);
 
     if (fs.existsSync(filePath)) {
-        res.download(filePath, `visualizer_${jobId}.mp4`, (err) => {
+        res.download(filePath, filename, (err) => {
             if (err) {
                 console.error('Download error:', err);
                 if (!res.headersSent) {
@@ -262,6 +330,9 @@ app.get('/api/download/:jobId', (req, res) => {
             }
         });
     } else {
+        // Clean up stale mapping
+        delete mapping[jobId];
+        saveMapping(mapping);
         res.status(404).json({ error: 'File not found' });
     }
 });
@@ -269,7 +340,22 @@ app.get('/api/download/:jobId', (req, res) => {
 // Status endpoint
 app.get('/api/status/:jobId', (req, res) => {
     const { jobId } = req.params;
-    const filename = `output_${jobId}.mp4`;
+    const mapping = loadMapping();
+    let filename = mapping[jobId];
+
+    // Fallback for old files from before mapping was introduced
+    if (!filename) {
+        const legacyPath = path.join(outputsDir, `output_${jobId}.mp4`);
+        if (fs.existsSync(legacyPath)) {
+            filename = `output_${jobId}.mp4`;
+            mapping[jobId] = filename;
+            saveMapping(mapping);
+        }
+    }
+
+    if (!filename) {
+        return res.json({ exists: false });
+    }
     const filePath = path.join(outputsDir, filename);
 
     if (fs.existsSync(filePath)) {
@@ -281,6 +367,9 @@ app.get('/api/status/:jobId', (req, res) => {
             filename: filename
         });
     } else {
+        // Clean up stale mapping
+        delete mapping[jobId];
+        saveMapping(mapping);
         res.json({ exists: false });
     }
 });

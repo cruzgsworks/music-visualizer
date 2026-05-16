@@ -23,6 +23,9 @@ $(document).ready(function() {
     // Initialize WebSocket
     initWebSocket();
     
+    // Load recent downloads from localStorage
+    loadRecentDownloads();
+    
     // Event Bindings
     bindEvents();
     
@@ -323,7 +326,8 @@ $(document).ready(function() {
                     barCount: parseInt($('#barCount').val()),
                     glowIntensity: parseInt($('#glowIntensity').val()),
                     barSensitivity: parseInt($('#barSensitivity').val()),
-                    gpuMode: $('#gpuMode').val()
+                    gpuMode: $('#gpuMode').val(),
+                    style: $('#visualizerStyle').val()
                 };
                 
                 $.ajax({
@@ -334,6 +338,7 @@ $(document).ready(function() {
                         jobId: state.currentJobId,
                         audioFilename: uploadData.audio.filename,
                         imageFilename: uploadData.image.filename,
+                        audioOriginalName: uploadData.audio.originalname,
                         settings: settings
                     }),
                     success: function() {
@@ -359,18 +364,12 @@ $(document).ready(function() {
             $('#statusText').text(message);
         }
         
-        // Change color based on progress
+        // Stop animation at 100%
         var $bar = $('#progressBar');
-        $bar.removeClass('bg-info bg-primary bg-warning bg-success');
-        
-        if (percent < 30) {
-            $bar.addClass('bg-info');
-        } else if (percent < 70) {
-            $bar.addClass('bg-primary');
-        } else if (percent < 100) {
-            $bar.addClass('bg-warning');
+        if (percent >= 100) {
+            $bar.css('animation', 'none');
         } else {
-            $bar.addClass('bg-success').removeClass('progress-bar-animated');
+            $bar.css('animation', '');
         }
     }
     
@@ -387,6 +386,13 @@ $(document).ready(function() {
     }
     
     function handleComplete(data) {
+        // Guard: Only process complete messages that have download URL
+        // The Node.js server sends the final complete with downloadUrl.
+        // Python also sends a complete signal, but without downloadUrl.
+        if (!data.downloadUrl) {
+            return;
+        }
+        
         if (data.success) {
             updateProgress(100, 'Complete!');
             log('Video generation complete!', 'success');
@@ -396,6 +402,9 @@ $(document).ready(function() {
             $('#downloadBtn')
                 .attr('href', data.downloadUrl)
                 .attr('download', data.filename);
+            
+            // Save to localStorage for persistence across refreshes
+            saveDownload(state.currentJobId, data.filename, data.downloadUrl);
         } else {
             showError(data.error || 'Generation failed');
         }
@@ -438,6 +447,115 @@ $(document).ready(function() {
         
         updateGenerateButton();
     }
+    
+    // Recent Downloads Management
+    function saveDownload(jobId, filename, downloadUrl) {
+        var downloads = JSON.parse(localStorage.getItem('visualizerDownloads') || '[]');
+        
+        // Add new download at the beginning
+        downloads.unshift({
+            jobId: jobId,
+            filename: filename,
+            downloadUrl: downloadUrl,
+            createdAt: new Date().toISOString()
+        });
+        
+        // Keep only last 20 downloads
+        if (downloads.length > 20) {
+            downloads = downloads.slice(0, 20);
+        }
+        
+        localStorage.setItem('visualizerDownloads', JSON.stringify(downloads));
+        renderRecentDownloads();
+    }
+    
+    function loadRecentDownloads() {
+        renderRecentDownloads();
+    }
+    
+    function renderRecentDownloads() {
+        var downloads = JSON.parse(localStorage.getItem('visualizerDownloads') || '[]');
+        var $list = $('#recentDownloadsList');
+        var $section = $('#recentDownloadsSection');
+        
+        if (downloads.length === 0) {
+            $section.hide();
+            return;
+        }
+        
+        $list.empty();
+        
+        downloads.forEach(function(download) {
+            var createdAt = new Date(download.createdAt);
+            var timeAgo = getTimeAgo(createdAt);
+            
+            var $item = $('<div class="list-group-item d-flex justify-content-between align-items-center">');
+            $item.html(
+                '<div class="me-3">' +
+                '<div class="fw-semibold text-truncate" style="max-width: 300px;">' + 
+                '<i class="bi bi-film me-2 text-primary"></i>' + escapeHtml(download.filename) + '</div>' +
+                '<small class="text-muted">' + timeAgo + '</small>' +
+                '</div>' +
+                '<button type="button" class="btn btn-sm btn-outline-primary download-recent-btn" ' +
+                'data-url="' + download.downloadUrl + '" data-filename="' + download.filename + '">' +
+                '<i class="bi bi-download"></i>' +
+                '</button>'
+            );
+            
+            $list.append($item);
+        });
+        
+        // Bind click events for download buttons
+        $('.download-recent-btn').on('click', function() {
+            var url = $(this).data('url');
+            var filename = $(this).data('filename');
+            downloadFile(url, filename);
+        });
+        
+        $section.show();
+    }
+    
+    function getTimeAgo(date) {
+        var now = new Date();
+        var diffMs = now - date;
+        var diffMins = Math.floor(diffMs / 60000);
+        var diffHours = Math.floor(diffMs / 3600000);
+        var diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return diffMins + ' minutes ago';
+        if (diffHours < 24) return diffHours + ' hours ago';
+        if (diffDays < 7) return diffDays + ' days ago';
+        return date.toLocaleDateString();
+    }
+    
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    function downloadFile(url, filename) {
+        if (url && url !== '#') {
+            var tempLink = document.createElement('a');
+            tempLink.href = url;
+            tempLink.download = filename;
+            tempLink.style.display = 'none';
+            document.body.appendChild(tempLink);
+            tempLink.click();
+            document.body.removeChild(tempLink);
+            log('Download started: ' + filename, 'success');
+        }
+    }
+    
+    // Clear history button
+    $('#clearHistoryBtn').on('click', function() {
+        if (confirm('Clear all download history? This will not delete the video files.')) {
+            localStorage.removeItem('visualizerDownloads');
+            $('#recentDownloadsSection').hide();
+            log('Download history cleared', 'info');
+        }
+    });
     
     // Initial log
     log('Visualizer ready. Select files to begin.');
