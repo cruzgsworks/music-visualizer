@@ -77,11 +77,14 @@ $(document).ready(function() {
             var infoText = '';
             
             switch(mode) {
-                case 'amd':
-                    infoText = 'AMD GPU mode selected (h264_amf). Great for RX 6000/7000 series!';
+                case 'auto':
+                    infoText = 'Auto-detects NVIDIA NVENC or AMD AMF. Falls back to CPU if neither is available.';
                     break;
                 case 'nvidia':
                     infoText = 'NVIDIA GPU mode selected (h264_nvenc). Great for GTX 10 series or newer!';
+                    break;
+                case 'amd':
+                    infoText = 'AMD GPU mode selected (h264_amf). Great for RX 6000/7000 series!';
                     break;
                 default:
                     infoText = 'CPU mode works on any system but is slower than GPU encoding.';

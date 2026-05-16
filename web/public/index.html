@@ -117,9 +117,10 @@
                                 <i class="bi bi-question-circle" data-bs-toggle="tooltip" title="GPU encoding is faster but requires compatible hardware. AMD uses AMF, NVIDIA uses NVENC."></i>
                             </label>
                             <select class="form-select" id="gpuMode">
-                                <option value="cpu" selected>CPU Only (Compatible with all systems)</option>
-                                <option value="amd">AMD GPU (RX 6000/7000 series) - AMF Hardware Encoder</option>
-                                <option value="nvidia">NVIDIA GPU (GTX 10 series or newer) - NVENC Hardware Encoder</option>
+                                <option value="auto" selected>Auto-detect (recommended)</option>
+                                <option value="nvidia">NVIDIA GPU (NVENC)</option>
+                                <option value="amd">AMD GPU (AMF)</option>
+                                <option value="cpu">CPU - libx264 (compatible)</option>
                             </select>
                             <small class="text-muted" id="gpuInfo">
                                 CPU mode works on any computer but is slower. Select AMD for RX 7600 XT.

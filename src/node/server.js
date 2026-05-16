@@ -213,7 +213,7 @@ app.post('/api/generate', async (req, res) => {
         '--bars', String(settings.barCount || 64),
         '--glow', String(settings.glowIntensity || 50),
         '--bar-sensitivity', String(settings.barSensitivity || 60),
-        '--gpu-mode', settings.gpuMode || 'cpu',
+        '--gpu-mode', settings.gpuMode || 'auto',
         '--style', settings.style || 'circular',
         '--job-id', jobId
     ];
