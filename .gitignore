@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Build outputs
+output/
+temp/
+uploads/
+*.mp4
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+!web/public/**/*.png
+!web/public/**/*.jpg
