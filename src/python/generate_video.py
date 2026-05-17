@@ -249,13 +249,13 @@ def create_horizontal_mirrored_visualizer(audio_path, image_path, output_path,
             raw_heights = bar_heights_from_spectrum(
                 spectrum[:, col], num_bars, max_bar_length, bar_sensitivity)
 
-            # Mirror vertically: bass (low freq) at top AND bottom, mids in center
-            # Creates a symmetrical "butterfly" shape
+            # Inverted butterfly: longest bars (bass) in CENTER, shortest at top/bottom
+            # Creates a diamond shape ─ bass peaks in middle, treble at edges
             half = num_bars // 2
             heights = np.zeros(num_bars)
             for i in range(half):
-                heights[i] = raw_heights[i]                    # Top: bass -> mid
-                heights[num_bars - 1 - i] = raw_heights[i]     # Bottom: mid <- bass
+                heights[i] = raw_heights[half - 1 - i]         # Top: mid ← bass (increasing)
+                heights[num_bars - 1 - i] = raw_heights[half - 1 - i]  # Bottom: bass → mid (decreasing)
             if num_bars % 2 == 1:
                 heights[half] = raw_heights[half]              # Center bar
 
