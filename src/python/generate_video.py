@@ -216,17 +216,18 @@ def create_horizontal_mirrored_visualizer(audio_path, image_path, output_path,
         proc = start_ffmpeg_pipe(output_path, audio_path, w, h, fps,
                                  video_codec, video_preset, video_params)
 
-        # ── Visualizer geometry (bar area fits center image height) ──
+        # ── Visualizer geometry (bar area taller than image for vertical centering) ──
         max_bar_length = int((w - img_size) / 2 * 0.85)
         center_x = w // 2
         center_y = h // 2
         # Gap between image edge and bar start
         bar_gap = int(img_size * 0.08)  # ~8% of image size as breathing room
-        # Each bar+gap fits exactly within img_size
-        bar_unit = img_size / num_bars
+        # Bar area is 40% taller than image so bars extend above and below
+        bar_area_height = int(img_size * 1.4)
+        bar_unit = bar_area_height / num_bars
         bar_height = max(3, int(bar_unit * 0.55))
         gap_between_bars = max(1, int(bar_unit * 0.45))
-        start_y = center_y - img_size // 2
+        start_y = center_y - bar_area_height // 2
 
         # Pre-allocate frame buffer
         frame = np.empty((h, w, 3), dtype=np.uint8)
