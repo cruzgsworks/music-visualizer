@@ -216,14 +216,14 @@ def create_horizontal_mirrored_visualizer(audio_path, image_path, output_path,
         proc = start_ffmpeg_pipe(output_path, audio_path, w, h, fps,
                                  video_codec, video_preset, video_params)
 
-        # ── Visualizer geometry (bar area matches image height exactly) ──
+        # ── Visualizer geometry (bars centered within image, not touching edges) ──
         max_bar_length = int((w - img_size) / 2 * 0.85)
         center_x = w // 2
         center_y = h // 2
         # Gap between image edge and bar start
         bar_gap = int(img_size * 0.08)  # ~8% of image size as breathing room
-        # Bar area height equals image height for tight, centered diamond
-        bar_area_height = img_size
+        # Bar area is 60% of image height so bars don't touch image edges
+        bar_area_height = int(img_size * 0.60)
         bar_unit = bar_area_height / num_bars
         bar_height = max(3, int(bar_unit * 0.55))
         gap_between_bars = max(1, int(bar_unit * 0.45))
